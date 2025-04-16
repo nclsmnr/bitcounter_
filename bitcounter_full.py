@@ -59,7 +59,7 @@ def add_background_rain():
     st.markdown(html, unsafe_allow_html=True)
 
 # =====================================================
-# API FETCH (+ cache)
+# API FETCH + CACHE
 # =====================================================
 @st.cache_data(ttl=60)
 def get_btc_price():
@@ -147,17 +147,19 @@ def estimate_remaining_btc(em):
 
 def estimate_mining_countdown(em):
     reward = 6.25
-    blocks = estimate_remaining_btc(em)/reward
-    secs   = blocks * 10*60
+    blocks = estimate_remaining_btc(em) / reward
+    secs   = blocks * 10 * 60
     return datetime.datetime.now() + datetime.timedelta(seconds=secs)
 
 def format_countdown(dt):
-    diff = dt - datetime.datetime.now()
-    if diff.total_seconds()<=0:
+    now  = datetime.datetime.now()
+    diff = dt - now
+    if diff.total_seconds() <= 0:
         return "Terminato"
-    d,h = diff.days, *divmod(diff.seconds,3600)
-    m,s = divmod(h[1],60)
-    return f"{d}g {h[0]}h {m}m {s}s"
+    days = diff.days
+    hours, rem    = divmod(diff.seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"{days}g {hours}h {minutes}m {secs}s"
 
 # =====================================================
 # RENDER SEZIONI
@@ -165,7 +167,7 @@ def format_countdown(dt):
 def render_metrics(em, price):
     sup = estimate_real_supply(em)
     end = estimate_mining_countdown(em)
-    l,r = st.columns(2)
+    l, r = st.columns(2)
     with l:
         st.metric("Supply Massima", f"{sup['total']:,} BTC")
         st.metric("Supply Emessa", f"{sup['circulating']:,} BTC")
@@ -178,13 +180,12 @@ def render_metrics(em, price):
 
 def render_network():
     diff   = get_network_difficulty()
-    hr     = get_network_hashrate()/1e9
+    hr     = get_network_hashrate() / 1e9
     height = get_block_height()
-    # prossimo halving
-    next_h = ((height//210000)+1)*210000
+    next_h = ((height // 210000) + 1) * 210000
     rem    = next_h - height
-    dt_h   = datetime.datetime.now() + datetime.timedelta(seconds=rem*10*60)
-    c1,c2,c3 = st.columns(3)
+    dt_h   = datetime.datetime.now() + datetime.timedelta(seconds=rem * 10 * 60)
+    c1, c2, c3 = st.columns(3)
     with c1:
         st.metric("Difficoltà", f"{diff:.2f}")
         st.metric("Hashrate", f"{hr:.2f} GH/s")
@@ -196,15 +197,18 @@ def render_network():
         st.metric("Countdown Halving", format_countdown(dt_h))
 
 def render_mempool():
-    mp = get_mempool_data()
+    mp  = get_mempool_data()
     cnt = mp.get("count")
     vsz = mp.get("vsize")
     fee = mp.get("total_fee")
-    avg = fee/cnt if cnt else None
-    c1,c2,c3 = st.columns(3)
-    with c1: st.metric("Tx in Mempool", cnt or "N/A")
-    with c2: st.metric("Dim. Mempool", f"{vsz} vbytes" if vsz else "N/A")
-    with c3: st.metric("Fee Media", f"{avg:.2f} sat" if avg else "N/A")
+    avg = fee / cnt if cnt else None
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Tx in Mempool", cnt or "N/A")
+    with c2:
+        st.metric("Dim. Mempool", f"{vsz} vbytes" if vsz else "N/A")
+    with c3:
+        st.metric("Fee Media", f"{avg:.2f} sat" if avg else "N/A")
 
 def render_decentralization():
     nodes = get_node_stats()
@@ -222,20 +226,20 @@ def render_sentiment_and_news():
         st.markdown(f"- [{ni['title']}]({ni['link']})  \n  _{ni['pubDate']}_")
 
 def render_charts(em, price):
-    sup = estimate_real_supply(em)
-    real = price
-    theo = price * sup["circulating"] / sup["liquid"]
-    c1,c2 = st.columns(2)
+    sup   = estimate_real_supply(em)
+    real  = price
+    theo  = price * sup["circulating"] / sup["liquid"]
+    c1, c2 = st.columns(2)
     with c1:
-        fig, ax = plt.subplots(figsize=(5,4))
-        labels = ["Liquidi","Dormienti","Persi"]
-        vals   = [sup["liquid"]-sup["dormant"], sup["dormant"], sup["lost"]]
+        fig, ax = plt.subplots(figsize=(5, 4))
+        labels = ["Liquidi", "Dormienti", "Persi"]
+        vals   = [sup["liquid"] - sup["dormant"], sup["dormant"], sup["lost"]]
         ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
         ax.axis("equal")
         st.pyplot(fig)
     with c2:
-        fig, ax = plt.subplots(figsize=(5,4))
-        ax.bar(["Attuale","Teorico"], [real, theo], color=["blue","orange"])
+        fig, ax = plt.subplots(figsize=(5, 4))
+        ax.bar(["Attuale", "Teorico"], [real, theo], color=["blue", "orange"])
         ax.set_ylabel("USD")
         ax.set_title("Prezzo BTC")
         st.pyplot(fig)
@@ -245,8 +249,8 @@ def render_tradingview():
     <!-- TradingView Widget BEGIN -->
     <div class="tradingview-widget-container">
       <div id="tradingview_btc"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
+      <script src="https://s3.tradingview.com/tv.js"></script>
+      <script>
       new TradingView.widget({
         "width":"100%",
         "height":500,
@@ -309,6 +313,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
