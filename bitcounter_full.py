@@ -13,45 +13,50 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+REFRESH_INTERVAL = 60  # auto-refresh ogni 60s
 
 # =====================================================
 # EFFETTO DI PIOGGIA DI BTC IN BACKGROUND
 # =====================================================
 def add_background_rain():
-   <style>
-  @keyframes fall {{ 
-    0%   {{ transform: translateY(-100%); opacity: 0 }} 
-    10%  {{ opacity: 1 }} 
-    100% {{ transform: translateY(100vh); opacity: 0 }} 
-  }}
-  .btc {{
-    position: absolute;
-    top: -10%;
-    font-size: 24px;
-    color: gold;
-    user-select: none;
-    animation-name: fall;
-    animation-timing-function: linear;
-    animation-iteration-count: 1;
-  }}
-  
-</style>
-
-<div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
-<script>
-// Pioggia di ₿
-setInterval(() => {{
-  const c = document.getElementById("btc-container");
-  const d = document.createElement("div");
-  d.className = "btc";
-  d.innerText = "₿";
-  d.style.left = Math.random()*100 + "%";
-  const t = 5 + Math.random()*10;
-  d.style.animationDuration = t + "s";
-  d.style.animationDelay    = Math.random()*t + "s";
-  c.appendChild(d);
-  setTimeout(()=>d.remove(), t*1000);
-}}, 200);
+    html = """
+    <style>
+      @keyframes fall {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
+      }
+      .btc {
+          position: absolute;
+          top: -10%;
+          font-size: 24px;
+          color: gold;
+          user-select: none;
+          animation-name: fall;
+          animation-timing-function: linear;
+          animation-iteration-count: 1;
+      }
+    </style>
+    <div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
+    <script>
+    (function(){
+      var container = document.getElementById('btc-container');
+      function createBTC(){
+        var d = document.createElement('div');
+        d.className = 'btc';
+        d.innerText = '₿';
+        d.style.left = Math.random() * 100 + '%';
+        var duration = 5 + Math.random() * 10;
+        d.style.animationDuration = duration + 's';
+        d.style.animationDelay = Math.random() * duration + 's';
+        container.appendChild(d);
+        setTimeout(function(){ d.remove(); }, duration * 1000);
+      }
+      setInterval(createBTC, 200);
+    })();
+    </script>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 # =====================================================
 # API FETCH + CACHE
@@ -166,17 +171,119 @@ def format_countdown(dt):
 # =====================================================
 # RENDER SEZIONI
 # =====================================================
-# (le sezioni rimangono invariate rispetto alla versione precedente)
-# ... [omesse per brevità] ...
+def render_metrics(em, price):
+    sup = estimate_real_supply(em)
+    end_time = estimate_mining_countdown(em)
+    col_left, col_right = st.columns(2)
+    with col_left:
+        st.metric("Supply Massima", f"{sup['total']:,} BTC")
+        st.metric("Supply Emessa", f"{sup['circulating']:,} BTC")
+        st.metric("Supply Liquida", f"{sup['liquid']:,} BTC")
+        st.metric("BTC Persi", f"{sup['lost']:,} BTC")
+        st.metric("Prezzo BTC", f"${price:,.2f}")
+    with col_right:
+        st.metric("BTC da Minare", f"{estimate_remaining_btc(em):,.2f} BTC")
+        st.metric("Countdown Mining", format_countdown(end_time))
+
+def render_network():
+    diff = get_network_difficulty()
+    hashrate = get_network_hashrate() / 1e9
+    height = get_block_height()
+    next_halving = ((height // 210000) + 1) * 210000
+    blocks_remaining = next_halving - height
+    halving_time = datetime.datetime.now() + datetime.timedelta(seconds=blocks_remaining * 10 * 60)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Difficoltà", f"{diff:.2f}")
+        st.metric("Hashrate", f"{hashrate:.2f} GH/s")
+    with c2:
+        st.metric("Block Height", f"{height}")
+        st.metric("Tempo Medio Blocco", "10 min (target)")
+    with c3:
+        st.metric("Prox. Halving", f"{next_halving}")
+        st.metric("Countdown Halving", format_countdown(halving_time))
+
+def render_mempool():
+    mp = get_mempool_data()
+    count = mp.get("count")
+    vsize = mp.get("vsize")
+    total_fee = mp.get("total_fee")
+    avg_fee = total_fee / count if count else None
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Tx in Mempool", count or "N/A")
+    with c2:
+        st.metric("Dim. Mempool", f"{vsize} vbytes" if vsize else "N/A")
+    with c3:
+        st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+
+def render_decentralization():
+    nodes = get_node_stats()
+    st.metric("Nodi Attivi", nodes or "N/A")
+
+def render_sentiment_and_news():
+    fg = get_fear_greed_index()
+    st.metric(
+        "Fear & Greed Index",
+        f"{fg['value']} ({fg['classification']})",
+        delta=fg['timestamp'].strftime("%Y-%m-%d %H:%M")
+    )
+    st.markdown("**Ultime Notizie su Bitcoin**")
+    for item in get_btc_news():
+        st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
+
+def render_charts(em, price):
+    sup = estimate_real_supply(em)
+    real = price
+    theo = price * sup['circulating'] / sup['liquid']
+    c1, c2 = st.columns(2)
+    with c1:
+        fig, ax = plt.subplots(figsize=(5,4))
+        labels = ["Liquidi", "Dormienti", "Persi"]
+        vals = [sup['liquid'] - sup['dormant'], sup['dormant'], sup['lost']]
+        ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
+    with c2:
+        fig, ax = plt.subplots(figsize=(5,4))
+        ax.bar(["Attuale", "Teorico"], [real, theo], color=["blue","orange"])
+        ax.set_ylabel("USD")
+        st.pyplot(fig)
+
+def render_tradingview():
+    widget = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div id="tradingview_btc"></div>
+      <script src="https://s3.tradingview.com/tv.js"></script>
+      <script>
+      new TradingView.widget({
+        "width":"100%","height":500,
+        "symbol":"COINBASE:BTCUSD",
+        "interval":"60","timezone":"Etc/UTC",
+        "theme":"light","style":"1","locale":"it",
+        "toolbar_bg":"#f1f3f6",
+        "hide_side_toolbar":false,
+        "withdateranges":true,
+        "allow_symbol_change":true,
+        "details":true,
+        "container_id":"tradingview_btc"
+      });
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    components.html(widget, height=520)
 
 # =====================================================
 # MAIN
 # =====================================================
 def main():
     add_background_rain()
+    st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
 
     st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
-    st.info("Dati aggiornati ogni minuto (auto-refresh disattivato per compatibilità grafica)")
+    st.info(f"Aggiornamento ogni {REFRESH_INTERVAL} s")
 
     price = get_btc_price()
     bc = get_blockchain_data()
