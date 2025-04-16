@@ -171,7 +171,7 @@ def render_sentiment_and_news():
     st.markdown("**Ultime Notizie su Bitcoin**")
     for item in get_btc_news():
         st.markdown(f"- [{item['title']}]({item['link']})  
-  _{item['pubDate']}_")
+  _{item['pubDate']}_"))
 
 def render_charts(em, price):
     circ = em
@@ -234,8 +234,8 @@ def main():
         return
     emitted = bc['btc_emitted']
 
-    st.markdown(f"<h4 style='margin-bottom:0.5rem'>{Calcoli e Stime}</h4>", unsafe_allow_html=True)
-with st.expander("Calcoli e Stime", expanded=False):
+    st.markdown("<h4 style='margin-bottom:0.5rem'>Calcoli e Stime</h4>", unsafe_allow_html=True)
+    with st.expander("Calcoli e Stime", expanded=False):
         render_metrics(emitted, price)
 
     with st.expander("Statistiche di Rete", expanded=False):
@@ -258,6 +258,7 @@ with st.expander("Calcoli e Stime", expanded=False):
 
 if __name__ == "__main__":
     main()
+
 
 
 
