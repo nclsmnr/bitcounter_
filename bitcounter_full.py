@@ -185,7 +185,6 @@ def render_price_chart(current_price, theoretical_price):
 # PROGRAMMA PRINCIPALE
 # =====================================================
 def main():
-    # Aggiunge l'effetto di pioggia di BTC in background
     add_background_rain()
 
     # Inserisce il meta refresh per il ricaricamento automatico
