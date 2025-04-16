@@ -10,6 +10,62 @@ st.set_page_config(page_title="BITCOUNTER", layout="wide", initial_sidebar_state
 REFRESH_INTERVAL = 60  # Aggiornamento automatico ogni 60 secondi
 
 # =====================================================
+# FUNZIONE PER AGGIUNGERE L'EFFETTO DI PIOGGIA DI BTC
+# =====================================================
+def add_background_rain():
+    """
+    Iniettiamo HTML, CSS e JavaScript:
+    - CSS per l'animazione 'fall'
+    - JS per creare un nuovo simbolo ₿ ogni 200ms,
+      facendolo scorrere dall'alto verso il basso
+    """
+    html_code = """
+    <style>
+      /* Animazione che fa cadere l'elemento dall'alto verso il basso */
+      @keyframes fall {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
+      }
+      .btc {
+          position: absolute;
+          top: -10%;
+          font-size: 24px;
+          color: gold;
+          user-select: none;
+          animation-name: fall;
+          animation-timing-function: linear;
+          animation-iteration-count: 1;
+      }
+    </style>
+    <div id="btc-container" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1;"></div>
+    <script>
+      (function() {
+          var container = document.getElementById('btc-container');
+          function createBTC() {
+              var btc = document.createElement('div');
+              btc.className = 'btc';
+              btc.innerHTML = '₿';
+              btc.style.left = Math.random() * 100 + '%';
+              // Durata di caduta compresa tra 5 e 15 secondi
+              var duration = 5 + Math.random() * 10;
+              btc.style.animationDuration = duration + 's';
+              // Ritardo prima che inizi la caduta
+              btc.style.animationDelay = (Math.random() * duration) + 's';
+              container.appendChild(btc);
+              // Rimuove l'elemento una volta terminata l'animazione
+              setTimeout(function() {
+                  btc.remove();
+              }, duration * 1000);
+          }
+          // Crea un nuovo ₿ ogni 200 ms
+          setInterval(createBTC, 200);
+      })();
+    </script>
+    """
+    st.markdown(html_code, unsafe_allow_html=True)
+
+# =====================================================
 # FUNZIONI DI RACCOLTA DATI (Cache TTL = 60 sec)
 # =====================================================
 @st.cache_data(ttl=60)
@@ -62,13 +118,13 @@ def estimate_remaining_btc(btc_emitted, total_supply=21_000_000):
 
 def estimate_mining_countdown(btc_emitted):
     """
-    Stima semplificata: si assume un block reward costante di 6.25 BTC
-    e 10 minuti per blocco, senza tenere conto dei prossimi halving.
+    Stima semplificata: block reward di 6.25 BTC costante,
+    tempo medio di 10 minuti a blocco, no halving successivi.
     """
     block_reward = 6.25
     remaining_btc = estimate_remaining_btc(btc_emitted)
     remaining_blocks = remaining_btc / block_reward
-    seconds_remaining = remaining_blocks * 10 * 60  # 10 minuti per blocco
+    seconds_remaining = remaining_blocks * 10 * 60
     return datetime.datetime.now() + datetime.timedelta(seconds=seconds_remaining)
 
 def format_countdown(target_time):
@@ -131,7 +187,8 @@ def render_price_chart(current_price, theoretical_price):
 def main():
     # Aggiunge l'effetto di pioggia di BTC in background
     add_background_rain()
-    # Inserisce il meta refresh per aggiornamento automatico ogni REFRESH_INTERVAL secondi
+
+    # Inserisce il meta refresh per il ricaricamento automatico
     st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
 
     st.title("BITCOUNTER - Real Bitcoin Liquidity Dashboard")
@@ -144,15 +201,15 @@ def main():
         st.error("Impossibile recuperare i dati necessari. Riprova più tardi.")
         return
 
+    # Calcoli e stime
     btc_emitted = blockchain_data["btc_emitted"]
     supply_data = estimate_real_supply(btc_emitted)
     current_price, theoretical_price = calculate_theoretical_price(price, supply_data["circulating"], supply_data["liquid"])
 
-    # Visualizzazione dei calcoli: metriche divise in due colonne
+    # Visualizzazione
     st.header("Calcoli e Stime")
-    render_metrics(supply_data, price, btc_emitted)
+    render_metrics(supply_data, current_price, btc_emitted)
 
-    # Visualizzazione dei grafici affiancati in due colonne
     st.header("Grafici")
     col1, col2 = st.columns(2)
     with col1:
@@ -162,5 +219,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
