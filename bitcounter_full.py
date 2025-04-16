@@ -1,6 +1,5 @@
 import streamlit as st
 import streamlit.components.v1 as components
-import streamlit.runtime.scriptrunner.script_run_context as script_context
 import requests
 import matplotlib.pyplot as plt
 import datetime
