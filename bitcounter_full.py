@@ -2,21 +2,22 @@ import streamlit as st
 import requests
 import matplotlib.pyplot as plt
 import datetime
+import xml.etree.ElementTree as ET
 
 # =====================================================
 # CONFIGURAZIONE E COSTANTI
 # =====================================================
-st.set_page_config(page_title="BITCOUNTER", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="BITCOUNTER", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
 REFRESH_INTERVAL = 60  # Aggiornamento automatico ogni 60 secondi
 
 # =====================================================
-# FUNZIONE PER AGGIUNGERE L'EFFETTO DI PIOGGIA DI BTC
+# EFFETTO DI PIOGGIA DI BTC IN BACKGROUND
 # =====================================================
 def add_background_rain():
-    """
-    Inietta HTML, CSS e JavaScript per simulare un effetto di "pioggia" di simboli BTC.
-    Vengono creati elementi con l'icona "₿" che cadono dall'alto verso il basso.
-    """
     html_code = """
     <style>
       @keyframes fall {
@@ -37,299 +38,248 @@ def add_background_rain():
     </style>
     <div id="btc-container" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1;"></div>
     <script>
-      (function {
+      (function() {
           var container = document.getElementById('btc-container');
           function createBTC() {
               var btc = document.createElement('div');
               btc.className = 'btc';
               btc.innerHTML = '₿';
               btc.style.left = Math.random() * 100 + '%';
-              var duration = 5 + Math.random() * 10;  // Durata di caduta tra 5 e 15 secondi
+              var duration = 5 + Math.random() * 10;
               btc.style.animationDuration = duration + 's';
               btc.style.animationDelay = (Math.random() * duration) + 's';
               container.appendChild(btc);
-              setTimeout(function() {
-                  btc.remove();
-              }, duration * 1000);
+              setTimeout(function() { btc.remove(); }, duration * 1000);
           }
-          // Crea un nuovo simbolo BTC ogni 200 ms
           setInterval(createBTC, 200);
-      });
+      })();
     </script>
     """
     st.markdown(html_code, unsafe_allow_html=True)
 
 # =====================================================
-# FUNZIONI DI RACCOLTA DATI CON CACHE (TTL = 60 sec)
+# API DATA FETCH (CACHE TTL)
 # =====================================================
 @st.cache_data(ttl=60)
 def get_btc_price():
-    try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {"ids": "bitcoin", "vs_currencies": "usd"}
-        response = requests.get(url, params=params, timeout=5)
-        response.raise_for_status()
-        return response.json()["bitcoin"]["usd"]
-    except Exception as e:
-        st.error(f"Errore nel recupero del prezzo BTC: {e}")
-        return None
+    url = "https://api.coingecko.com/api/v3/simple/price"
+    params = {"ids": "bitcoin", "vs_currencies": "usd"}
+    r = requests.get(url, params=params, timeout=5)
+    r.raise_for_status()
+    return r.json()["bitcoin"]["usd"]
 
 @st.cache_data(ttl=60)
 def get_blockchain_data():
-    data = {}
-    try:
-        response = requests.get("https://api.blockchain.info/q/totalbc", timeout=5)
-        response.raise_for_status()
-        satoshi_total = int(response.text)
-        data["btc_emitted"] = satoshi_total / 100_000_000
-    except Exception as e:
-        st.error(f"Errore nel recupero dati blockchain: {e}")
-        data["btc_emitted"] = None
-    return data
+    r = requests.get("https://api.blockchain.info/q/totalbc", timeout=5)
+    r.raise_for_status()
+    return {"btc_emitted": int(r.text) / 1e8}
 
 @st.cache_data(ttl=60)
 def get_network_difficulty():
-    try:
-        url = "https://blockchain.info/q/getdifficulty"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        return float(response.text)
-    except Exception as e:
-        st.error(f"Errore nel recupero della difficoltà: {e}")
-        return None
+    r = requests.get("https://blockchain.info/q/getdifficulty", timeout=5)
+    r.raise_for_status()
+    return float(r.text)
 
 @st.cache_data(ttl=60)
 def get_network_hashrate():
-    try:
-        url = "https://blockchain.info/q/hashrate"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        return float(response.text)
-    except Exception as e:
-        st.error(f"Errore nel recupero dell'hashrate: {e}")
-        return None
+    r = requests.get("https://blockchain.info/q/hashrate", timeout=5)
+    r.raise_for_status()
+    return float(r.text)
 
 @st.cache_data(ttl=60)
 def get_block_height():
-    try:
-        url = "https://blockchain.info/q/getblockcount"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        return int(response.text)
-    except Exception as e:
-        st.error(f"Errore nel recupero del block height: {e}")
-        return None
+    r = requests.get("https://blockchain.info/q/getblockcount", timeout=5)
+    r.raise_for_status()
+    return int(r.text)
 
 @st.cache_data(ttl=60)
 def get_mempool_data():
-    try:
-        url = "https://mempool.space/api/mempool"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        return response.json()  # Atteso: {"count": int, "vsize": int, "total_fee": int}
-    except Exception as e:
-        st.error(f"Errore nel recupero dei dati della mempool: {e}")
-        return None
+    r = requests.get("https://mempool.space/api/mempool", timeout=5)
+    r.raise_for_status()
+    return r.json()
 
 @st.cache_data(ttl=60)
 def get_node_stats():
-    try:
-        url = "https://bitnodes.io/api/v1/snapshots/latest/"
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        return data.get("total_nodes", None)
-    except Exception as e:
-        st.error(f"Errore nel recupero dei dati sui nodi: {e}")
-        return None
+    r = requests.get("https://bitnodes.io/api/v1/snapshots/latest/", timeout=5)
+    r.raise_for_status()
+    return r.json().get("total_nodes")
+
+@st.cache_data(ttl=300)
+def get_fear_greed_index():
+    r = requests.get("https://api.alternative.me/fng/?limit=1&format=json", timeout=5)
+    r.raise_for_status()
+    data = r.json()["data"][0]
+    return {
+        "value": int(data["value"]),
+        "classification": data["value_classification"],
+        "timestamp": datetime.datetime.fromtimestamp(int(data["timestamp"]))
+    }
+
+@st.cache_data(ttl=300)
+def get_btc_news(count=5):
+    rss_url = "https://news.google.com/rss/search?q=bitcoin&hl=en-US&gl=US&ceid=US:en"
+    r = requests.get(rss_url, timeout=5)
+    r.raise_for_status()
+    root = ET.fromstring(r.content)
+    items = root.findall(".//item")[:count]
+    news = []
+    for item in items:
+        title = item.find("title").text
+        link  = item.find("link").text
+        pubDate = item.find("pubDate").text
+        news.append({"title": title, "link": link, "pubDate": pubDate})
+    return news
 
 # =====================================================
-# FUNZIONI DI CALCOLO E STIMA
+# CALCOLI E STIME
 # =====================================================
-def estimate_real_supply(btc_emitted, lost_estimate=4_000_000, dormant=1_500_000):
-    circulating = btc_emitted
-    lost = lost_estimate
-    liquid = circulating - lost
+def estimate_real_supply(emitted, lost=4_000_000, dormant=1_500_000):
+    circ   = emitted
+    liq    = circ - lost
     return {
-        "total_theoretical": 21_000_000,
-        "circulating": circulating,
-        "liquid": liquid,
+        "total": 21_000_000,
+        "circulating": circ,
+        "liquid": liq,
         "lost": lost,
         "dormant": dormant
     }
 
-def calculate_theoretical_price(price_now, circulating, liquid_supply):
-    market_cap = price_now * circulating
-    theoretical = market_cap / liquid_supply if liquid_supply else 0
-    return price_now, theoretical
+def estimate_remaining_btc(emitted):
+    return 21_000_000 - emitted
 
-def estimate_remaining_btc(btc_emitted, total_supply=21_000_000):
-    return total_supply - btc_emitted
+def estimate_mining_countdown(emitted):
+    reward = 6.25
+    blocks = estimate_remaining_btc(emitted) / reward
+    secs   = blocks * 10 * 60
+    return datetime.datetime.now() + datetime.timedelta(seconds=secs)
 
-def estimate_mining_countdown(btc_emitted):
-    block_reward = 6.25
-    remaining_btc = estimate_remaining_btc(btc_emitted)
-    remaining_blocks = remaining_btc / block_reward
-    seconds_remaining = remaining_blocks * 10 * 60  # 10 minuti per blocco
-    return datetime.datetime.now() + datetime.timedelta(seconds=seconds_remaining)
-
-def format_countdown(target_time):
-    now = datetime.datetime.now()
-    diff = target_time - now
+def format_countdown(dt):
+    diff = dt - datetime.datetime.now()
     if diff.total_seconds() <= 0:
-        return "Mining terminato"
-    days = diff.days
-    hours, rem = divmod(diff.seconds, 3600)
-    minutes, seconds = divmod(rem, 60)
-    return f"{days}g {hours}h {minutes}m {seconds}s"
+        return "Term. halving/mining"
+    d,h,r = diff.days, *divmod(diff.seconds,3600)
+    m,s   = divmod(r,60)
+    return f"{d}g {h}h {m}m {s}s"
 
 # =====================================================
-# FUNZIONI DI VISUALIZZAZIONE DEI CALCOLI PRINCIPALI
-# (Supply, Prezzo, Countdown, ecc.)
+# RENDERING SEZIONI
 # =====================================================
-def render_metrics(supply_data, price, btc_emitted):
-    remaining_btc = estimate_remaining_btc(btc_emitted)
-    mining_end = estimate_mining_countdown(btc_emitted)
-    col_left, col_right = st.columns(2)
-    with col_left:
-        st.metric("Supply Massima", f"{supply_data['total_theoretical']:,} BTC")
-        st.metric("Supply Emessa", f"{supply_data['circulating']:,} BTC")
-        st.metric("Supply Liquida", f"{supply_data['liquid']:,} BTC")
-        st.metric("BTC Persi", f"{supply_data['lost']:,} BTC")
+def render_metrics(emitted, price):
+    supply = estimate_real_supply(emitted)
+    end_mining = estimate_mining_countdown(emitted)
+    left, right = st.columns(2)
+    with left:
+        st.metric("Supply Massima", f"{supply['total']:,} BTC")
+        st.metric("Supply Emessa", f"{supply['circulating']:,} BTC")
+        st.metric("Supply Liquida", f"{supply['liquid']:,} BTC")
+        st.metric("BTC Persi", f"{supply['lost']:,} BTC")
         st.metric("Prezzo BTC", f"${price:,.2f}")
-    with col_right:
-        st.metric("BTC da Minare", f"{remaining_btc:,.2f} BTC")
-        st.metric("Countdown Fine Mining", format_countdown(mining_end))
+    with right:
+        st.metric("BTC da Minare", f"{estimate_remaining_btc(emitted):,.2f} BTC")
+        st.metric("Countdown Fine Mining", format_countdown(end_mining))
+
+def render_network():
+    diff   = get_network_difficulty()
+    hr     = get_network_hashrate()
+    height = get_block_height()
+    # prossimo halving
+    next_h = ((height//210000)+1)*210000
+    to_h   = next_h - height
+    dt_h   = datetime.datetime.now() + datetime.timedelta(seconds=to_h*10*60)
+    left, mid, right = st.columns(3)
+    with left:
+        st.metric("Difficoltà", f"{diff:.2f}")
+        st.metric("Hashrate", f"{hr/1e9:.2f} GH/s")
+    with mid:
+        st.metric("Block Height", f"{height}")
+        st.metric("Tempo Medio Blocco", "10 min (target)")
+    with right:
+        st.metric("Prox. Halving", f"{next_h}")
+        st.metric("Countdown Halving", format_countdown(dt_h))
+
+def render_mempool():
+    mp = get_mempool_data()
+    count = mp.get("count")
+    vsize = mp.get("vsize")
+    fee   = mp.get("total_fee")
+    avg_fee = fee/count if count else None
+    c1,c2,c3 = st.columns(3)
+    with c1: st.metric("Tx in Mempool", count or "N/A")
+    with c2: st.metric("Dimensione Mempool", f"{vsize} vbytes" if vsize else "N/A")
+    with c3: st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+
+def render_decentralization():
+    nodes = get_node_stats()
+    st.metric("Nodi Attivi", nodes or "N/A")
+
+def render_sentiment_and_news():
+    fg = get_fear_greed_index()
+    st.metric(
+        "Fear & Greed Index",
+        f"{fg['value']} ({fg['classification']})",
+        delta=str(fg['timestamp'].strftime("%Y-%m-%d %H:%M"))
+    )
+    st.markdown("**Ultime Notizie su Bitcoin**")
+    for item in get_btc_news():
+        st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
+
+def render_charts(emitted, price):
+    supply = estimate_real_supply(emitted)
+    real, theo = price, price * supply["circulating"] / supply["liquid"]
+    c1,c2 = st.columns(2)
+    with c1:
+        fig, ax = plt.subplots(figsize=(5,4))
+        labels = ["Liquidi","Dormienti","Persi"]
+        vals = [supply["liquid"]-supply["dormant"], supply["dormant"], supply["lost"]]
+        ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
+    with c2:
+        fig, ax = plt.subplots(figsize=(5,4))
+        ax.bar(["Attuale","Teorico"], [real, theo], color=["blue","orange"])
+        ax.set_ylabel("USD")
+        ax.set_title("Prezzo BTC")
+        st.pyplot(fig)
 
 # =====================================================
-# FUNZIONI DI VISUALIZZAZIONE DEI GRAFICI
-# =====================================================
-def render_pie_chart(supply_data):
-    labels = ["BTC Liquidi", "BTC Dormienti", "BTC Persi"]
-    values = [
-        supply_data["liquid"] - supply_data["dormant"],
-        supply_data["dormant"],
-        supply_data["lost"]
-    ]
-    fig, ax = plt.subplots(figsize=(5, 4))
-    ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
-    ax.axis("equal")
-    st.subheader("Distribuzione della Supply Effettiva")
-    st.pyplot(fig)
-
-def render_price_chart(current_price, theoretical_price):
-    labels = ["Prezzo Attuale", "Prezzo Teorico"]
-    values = [current_price, theoretical_price]
-    fig, ax = plt.subplots(figsize=(5, 4))
-    ax.bar(labels, values, color=["blue", "orange"])
-    ax.set_ylabel("USD")
-    ax.set_title("Confronto Prezzo BTC Reale vs. Teorico")
-    st.subheader("Analisi Prezzo BTC")
-    st.pyplot(fig)
-
-# =====================================================
-# FUNZIONI DI VISUALIZZAZIONE DELLE STATISTICHE DI RETE
-# =====================================================
-def render_network_metrics():
-    difficulty = get_network_difficulty()
-    hashrate = get_network_hashrate()
-    block_height = get_block_height()
-    avg_block_time = "10 minuti (target)"
-    if block_height is not None:
-        next_halving_block = ((block_height // 210000) + 1) * 210000
-        blocks_remaining = next_halving_block - block_height
-        seconds_to_halving = blocks_remaining * 10 * 60
-        halving_time = datetime.datetime.now() + datetime.timedelta(seconds=seconds_to_halving)
-        halving_countdown = format_countdown(halving_time)
-    else:
-        next_halving_block = "N/A"
-        halving_countdown = "N/A"
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Difficoltà di Mining", f"{difficulty:.2f}" if difficulty is not None else "N/A")
-        st.metric("Hash Rate", f"{hashrate:.2f} GH/s" if hashrate is not None else "N/A")
-    with col2:
-        st.metric("Block Height", f"{block_height}" if block_height is not None else "N/A")
-        st.metric("Tempo Medio per Blocco", avg_block_time)
-    with col3:
-        st.metric("Prossimo Halving (Block)", f"{next_halving_block}" if next_halving_block != "N/A" else "N/A")
-        st.metric("Countdown al Halving", halving_countdown)
-
-# =====================================================
-# FUNZIONI DI VISUALIZZAZIONE DELLE STATISTICHE DELLA MEMPOOL
-# =====================================================
-def render_mempool_metrics():
-    mempool = get_mempool_data()
-    if mempool:
-        count = mempool.get("count", None)
-        total_fee = mempool.get("total_fee", None)
-        vsize = mempool.get("vsize", None)
-        fee_media = (total_fee / count) if count and total_fee is not None and count > 0 else None
-    else:
-        count = total_fee = vsize = fee_media = None
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Transazioni in Mempool", f"{count}" if count is not None else "N/A")
-    with col2:
-        st.metric("Fee Media", f"{fee_media:.2f} sat" if fee_media is not None else "N/A")
-    with col3:
-        st.metric("Dimensione Mempool", f"{vsize} vbytes" if vsize is not None else "N/A")
-
-# =====================================================
-# FUNZIONI DI VISUALIZZAZIONE DELLA DECENTRALIZZAZIONE
-# =====================================================
-def render_decentralization_metrics():
-    total_nodes = get_node_stats()
-    st.metric("Nodi Attivi", f"{total_nodes}" if total_nodes is not None else "N/A")
-
-# =====================================================
-# PROGRAMMA PRINCIPALE
+# MAIN
 # =====================================================
 def main():
-    # Aggiunge l'effetto di pioggia di BTC in background
     add_background_rain()
-    # Inserisce il meta refresh per il ricaricamento automatico
     st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
 
-    st.title("BITCOUNTER - Real Bitcoin Liquidity Dashboard")
-    st.info(f"La pagina si aggiorna automaticamente ogni {REFRESH_INTERVAL} secondi")
+    st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
+    st.info(f"Aggiornamento ogni {REFRESH_INTERVAL} s")
 
-    # Recupero dei dati principali
+    # dati base
     price = get_btc_price()
-    blockchain_data = get_blockchain_data()
-    if price is None or blockchain_data["btc_emitted"] is None:
-        st.error("Impossibile recuperare i dati necessari. Riprova più tardi.")
+    bc    = get_blockchain_data()
+    if price is None or bc["btc_emitted"] is None:
+        st.error("Errore recupero dati.")
         return
-    btc_emitted = blockchain_data["btc_emitted"]
-    supply_data = estimate_real_supply(btc_emitted)
-    current_price, theoretical_price = calculate_theoretical_price(price, supply_data["circulating"], supply_data["liquid"])
+    emitted = bc["btc_emitted"]
 
-    # Sezione: Calcoli e Stime (supply, BTC da minare, countdown)
     st.header("Calcoli e Stime")
-    render_metrics(supply_data, price, btc_emitted)
+    render_metrics(emitted, price)
 
-    # Sezione: Statistiche di Rete
     st.header("Statistiche di Rete")
-    render_network_metrics()
+    render_network()
 
-    # Sezione: Transazioni & Mempool
     st.header("Transazioni & Mempool")
-    render_mempool_metrics()
+    render_mempool()
 
-    # Sezione: Decentralizzazione della Rete
-    st.header("Decentralizzazione della Rete")
-    render_decentralization_metrics()
+    st.header("Decentralizzazione")
+    render_decentralization()
 
-    # Sezione: Grafici
+    st.header("Sentiment & News")
+    render_sentiment_and_news()
+
     st.header("Grafici")
-    col1, col2 = st.columns(2)
-    with col1:
-        render_pie_chart(supply_data)
-    with col2:
-        render_price_chart(current_price, theoretical_price)
+    render_charts(emitted, price)
 
 if __name__ == "__main__":
     main()
+
 
 
 
