@@ -19,7 +19,7 @@ st.set_page_config(
 # =====================================================
 def add_background_rain():
     html = """
-    <style>
+   <style>
   @keyframes fall {{ 
     0%   {{ transform: translateY(-100%); opacity: 0 }} 
     10%  {{ opacity: 1 }} 
@@ -35,27 +35,24 @@ def add_background_rain():
     animation-timing-function: linear;
     animation-iteration-count: 1;
   }}
-    </style>
-    <div id=\"btc-container\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;\"></div>
-    <script>
-    (function(){
-      var container = document.getElementById('btc-container');
-      function createBTC(){
-        var d = document.createElement('div');
-        d.className = 'btc';
-        d.innerText = '₿';
-        d.style.left = Math.random() * 100 + '%';
-        var duration = 5 + Math.random() * 10;
-        d.style.animationDuration = duration + 's';
-        d.style.animationDelay = Math.random() * duration + 's';
-        container.appendChild(d);
-        setTimeout(function(){ d.remove(); }, duration * 1000);
-      }
-      setInterval(createBTC, 200);
-    })();
-    </script>
-    """
-    st.markdown(html, unsafe_allow_html=True)
+  
+</style>
+
+<div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
+<script>
+// Pioggia di ₿
+setInterval(() => {{
+  const c = document.getElementById("btc-container");
+  const d = document.createElement("div");
+  d.className = "btc";
+  d.innerText = "₿";
+  d.style.left = Math.random()*100 + "%";
+  const t = 5 + Math.random()*10;
+  d.style.animationDuration = t + "s";
+  d.style.animationDelay    = Math.random()*t + "s";
+  c.appendChild(d);
+  setTimeout(()=>d.remove(), t*1000);
+}}, 200);
 
 # =====================================================
 # API FETCH + CACHE
