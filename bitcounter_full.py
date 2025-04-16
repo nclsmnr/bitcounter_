@@ -86,14 +86,21 @@ def format_countdown(target_time):
 # =====================================================
 def render_metrics(supply_data, price, btc_emitted):
     remaining_btc = estimate_remaining_btc(btc_emitted)
-    st.metric("Supply Massima", f"{supply_data['total_theoretical']:,} BTC")
-    st.metric("Supply Emessa", f"{supply_data['circulating']:,} BTC")
-    st.metric("Supply Liquida", f"{supply_data['liquid']:,} BTC")
-    st.metric("BTC Persi", f"{supply_data['lost']:,} BTC")
-    st.metric("Prezzo BTC", f"${price:,.2f}")
-    st.metric("BTC da Minare", f"{remaining_btc:,.2f} BTC")
     mining_end = estimate_mining_countdown(btc_emitted)
-    st.metric("Countdown Fine Mining", format_countdown(mining_end))
+    
+    # Dividi le metriche in due colonne:
+    # Colonna sinistra: 5 metriche (Supply Massima, Supply Emessa, Supply Liquida, BTC Persi, Prezzo BTC)
+    # Colonna destra: 2 metriche (BTC da Minare, Countdown Fine Mining)
+    col_left, col_right = st.columns(2)
+    with col_left:
+        st.metric("Supply Massima", f"{supply_data['total_theoretical']:,} BTC")
+        st.metric("Supply Emessa", f"{supply_data['circulating']:,} BTC")
+        st.metric("Supply Liquida", f"{supply_data['liquid']:,} BTC")
+        st.metric("BTC Persi", f"{supply_data['lost']:,} BTC")
+        st.metric("Prezzo BTC", f"${price:,.2f}")
+    with col_right:
+        st.metric("BTC da Minare", f"{remaining_btc:,.2f} BTC")
+        st.metric("Countdown Fine Mining", format_countdown(mining_end))
 
 def render_pie_chart(supply_data):
     labels = ["BTC Liquidi", "BTC Dormienti", "BTC Persi"]
@@ -102,7 +109,6 @@ def render_pie_chart(supply_data):
         supply_data["dormant"],
         supply_data["lost"]
     ]
-    # Imposta dimensione grafico 5x4 pollici
     fig, ax = plt.subplots(figsize=(5, 4))
     ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
     ax.axis("equal")
@@ -112,7 +118,6 @@ def render_pie_chart(supply_data):
 def render_price_chart(current_price, theoretical_price):
     labels = ["Prezzo Attuale", "Prezzo Teorico"]
     values = [current_price, theoretical_price]
-    # Imposta dimensione grafico 5x4 pollici
     fig, ax = plt.subplots(figsize=(5, 4))
     ax.bar(labels, values, color=["blue", "orange"])
     ax.set_ylabel("USD")
@@ -124,13 +129,13 @@ def render_price_chart(current_price, theoretical_price):
 # PROGRAMMA PRINCIPALE
 # =====================================================
 def main():
-    # Inserisce un meta refresh per l'aggiornamento automatico ogni REFRESH_INTERVAL secondi
+    # Aggiunge il meta refresh per aggiornamento automatico ogni REFRESH_INTERVAL secondi
     st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
 
     st.title("BITCOUNTER - Real Bitcoin Liquidity Dashboard")
     st.info(f"La pagina si aggiorna automaticamente ogni {REFRESH_INTERVAL} secondi")
 
-    # Recupero dei dati
+    # Recupero dati aggiornati
     price = get_btc_price()
     blockchain_data = get_blockchain_data()
     if price is None or blockchain_data["btc_emitted"] is None:
@@ -141,7 +146,7 @@ def main():
     supply_data = estimate_real_supply(btc_emitted)
     current_price, theoretical_price = calculate_theoretical_price(price, supply_data["circulating"], supply_data["liquid"])
 
-    # Visualizzazione dei calcoli (metrica) in verticale
+    # Visualizzazione dei calcoli: metriche divise in due colonne
     st.header("Calcoli e Stime")
     render_metrics(supply_data, price, btc_emitted)
 
@@ -155,6 +160,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
