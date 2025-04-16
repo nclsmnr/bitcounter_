@@ -126,52 +126,100 @@ def render_metrics(em, price):
         st.metric("Countdown Mining", format_countdown(end_time))
 
 def render_network():
-    diff = get_network_difficulty()
-    hashrate = get_network_hashrate() / 1e9
-    height = get_block_height()
-    next_halving = ((height // 210000) + 1) * 210000
-    blocks_remaining = next_halving - height
-    halving_time = datetime.datetime.now() + datetime.timedelta(seconds=blocks_remaining * 10 * 60)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("Difficoltà", f"{diff:.2f}")
-        st.metric("Hashrate", f"{hashrate:.2f} GH/s")
-    with c2:
-        st.metric("Block Height", f"{height}")
-        st.metric("Tempo Medio Blocco", "10 min (target)")
-    with c3:
-        st.metric("Prox. Halving", f"{next_halving}")
-        st.metric("Countdown Halving", format_countdown(halving_time))
+    st.info("Funzione di rete placeholder")
 
 def render_mempool():
-    mp = get_mempool_data()
-    count = mp.get("count")
-    vsize = mp.get("vsize")
-    total_fee = mp.get("total_fee")
-    avg_fee = total_fee / count if count else None
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.metric("Tx in Mempool", count or "N/A")
-    with c2:
-        st.metric("Dim. Mempool", f"{vsize} vbytes" if vsize else "N/A")
-    with c3:
-        st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+    st.info("Funzione mempool placeholder")
 
 def render_decentralization():
-    nodes = get_node_stats()
-    st.metric("Nodi Attivi", nodes or "N/A")
+    st.info("Funzione decentralizzazione placeholder")
 
 def render_sentiment_and_news():
-    fg = get_fear_greed_index()
-    st.metric(
-        "Fear & Greed Index",
-        f"{fg['value']} ({fg['classification']})",
-        delta=fg['timestamp'].strftime("%Y-%m-%d %H:%M")
-    )
-    st.markdown("**Ultime Notizie su Bitcoin**")
-    for item in get_btc_news():
-        st.markdown(f"- [{item['title']}]({item['link']})  
-  _{item['pubDate']}_")
+    st.info("Funzione sentiment/news placeholder")
+
+def render_charts(em, price):
+    st.info("Funzione grafici matplotlib placeholder")
+
+def render_tradingview():
+    widget = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div id="tradingview_btc"></div>
+      <script src="https://s3.tradingview.com/tv.js"></script>
+      <script>
+      new TradingView.widget({
+        "width":"100%","height":500,
+        "symbol":"COINBASE:BTCUSD",
+        "interval":"60","timezone":"Etc/UTC",
+        "theme":"light","style":"1","locale":"it",
+        "toolbar_bg":"#f1f3f6",
+        "hide_side_toolbar":false,
+        "withdateranges":true,
+        "allow_symbol_change":true,
+        "details":true,
+        "container_id":"tradingview_btc"
+      });
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    components.html(widget, height=520)
+
+# =====================================================
+# MAIN
+# =====================================================
+def main():
+    add_background_rain()
+
+    st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
+
+    price = get_btc_price()
+    bc = get_blockchain_data()
+    if price is None or bc['btc_emitted'] is None:
+        st.error("Errore recupero dati.")
+        return
+    emitted = bc['btc_emitted']
+
+    with st.expander("Calcoli e Stime", expanded=False):
+        render_metrics(emitted, price)
+
+    with st.expander("Statistiche di Rete", expanded=False):
+        render_network()
+
+    with st.expander("Transazioni & Mempool", expanded=False):
+        render_mempool()
+
+    with st.expander("Decentralizzazione", expanded=False):
+        render_decentralization()
+
+    with st.expander("Sentiment & News", expanded=False):
+        render_sentiment_and_news()
+
+    with st.expander("Grafici Matplotlib", expanded=False):
+        render_charts(emitted, price)
+
+    with st.expander("Grafico a Candele TradingView", expanded=False):
+        render_tradingview()
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
