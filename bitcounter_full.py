@@ -10,6 +10,53 @@ st.set_page_config(page_title="BITCOUNTER", layout="wide", initial_sidebar_state
 REFRESH_INTERVAL = 60  # Aggiornamento automatico ogni 60 secondi
 
 # =====================================================
+# FUNZIONE PER AGGIUNGERE L'EFFETTO DI PIOGGIA DI BTC
+# =====================================================
+def add_background_rain():
+    html_code = """
+    <style>
+      /* Definizione animazione per la caduta */
+      @keyframes fall {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
+      }
+      .btc {
+          position: absolute;
+          top: -10%;
+          font-size: 24px;
+          color: gold;
+          user-select: none;
+          animation-name: fall;
+          animation-timing-function: linear;
+          animation-iteration-count: 1;
+      }
+    </style>
+    <div id="btc-container" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1;"></div>
+    <script>
+      (function() {
+          var container = document.getElementById('btc-container');
+          function createBTC() {
+              var btc = document.createElement('div');
+              btc.className = 'btc';
+              btc.innerHTML = '₿';
+              btc.style.left = Math.random() * 100 + '%';
+              var duration = 5 + Math.random() * 10;
+              btc.style.animationDuration = duration + 's';
+              btc.style.animationDelay = (Math.random() * duration) + 's';
+              container.appendChild(btc);
+              setTimeout(function() {
+                  btc.remove();
+              }, duration * 1000);
+          }
+          // Crea un nuovo simbolo BTC ogni 200ms
+          setInterval(createBTC, 200);
+      })();
+    </script>
+    """
+    st.markdown(html_code, unsafe_allow_html=True)
+
+# =====================================================
 # FUNZIONI DI RACCOLTA DATI (Cache TTL = 60 sec)
 # =====================================================
 @st.cache_data(ttl=60)
@@ -129,13 +176,15 @@ def render_price_chart(current_price, theoretical_price):
 # PROGRAMMA PRINCIPALE
 # =====================================================
 def main():
-    # Aggiunge il meta refresh per aggiornamento automatico ogni REFRESH_INTERVAL secondi
+    # Aggiunge l'effetto di pioggia di BTC in background
+    add_background_rain()
+    # Inserisce il meta refresh per aggiornamento automatico ogni REFRESH_INTERVAL secondi
     st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
 
     st.title("BITCOUNTER - Real Bitcoin Liquidity Dashboard")
     st.info(f"La pagina si aggiorna automaticamente ogni {REFRESH_INTERVAL} secondi")
 
-    # Recupero dati aggiornati
+    # Recupero dei dati aggiornati
     price = get_btc_price()
     blockchain_data = get_blockchain_data()
     if price is None or blockchain_data["btc_emitted"] is None:
@@ -160,4 +209,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
