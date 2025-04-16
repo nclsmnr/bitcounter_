@@ -126,19 +126,73 @@ def render_metrics(em, price):
         st.metric("Countdown Mining", format_countdown(end_time))
 
 def render_network():
-    st.info("Funzione di rete placeholder")
+    diff = get_network_difficulty()
+    hashrate = get_network_hashrate() / 1e9
+    height = get_block_height()
+    next_halving = ((height // 210000) + 1) * 210000
+    blocks_remaining = next_halving - height
+    halving_time = datetime.datetime.now() + datetime.timedelta(seconds=blocks_remaining * 10 * 60)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Difficoltà", f"{diff:.2f}")
+        st.metric("Hashrate", f"{hashrate:.2f} GH/s")
+    with c2:
+        st.metric("Block Height", f"{height}")
+        st.metric("Tempo Medio Blocco", "10 min (target)")
+    with c3:
+        st.metric("Prox. Halving", f"{next_halving}")
+        st.metric("Countdown Halving", format_countdown(halving_time))
 
 def render_mempool():
-    st.info("Funzione mempool placeholder")
+    mp = get_mempool_data()
+    count = mp.get("count")
+    vsize = mp.get("vsize")
+    total_fee = mp.get("total_fee")
+    avg_fee = total_fee / count if count else None
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Tx in Mempool", count or "N/A")
+    with c2:
+        st.metric("Dim. Mempool", f"{vsize} vbytes" if vsize else "N/A")
+    with c3:
+        st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
 
 def render_decentralization():
-    st.info("Funzione decentralizzazione placeholder")
+    nodes = get_node_stats()
+    st.metric("Nodi Attivi", nodes or "N/A")
 
 def render_sentiment_and_news():
-    st.info("Funzione sentiment/news placeholder")
+    fg = get_fear_greed_index()
+    st.metric(
+        "Fear & Greed Index",
+        f"{fg['value']} ({fg['classification']})",
+        delta=fg['timestamp'].strftime("%Y-%m-%d %H:%M")
+    )
+    st.markdown("**Ultime Notizie su Bitcoin**")
+    for item in get_btc_news():
+        st.markdown(f"- [{item['title']}]({item['link']})  
+  _{item['pubDate']}_")
 
 def render_charts(em, price):
-    st.info("Funzione grafici matplotlib placeholder")
+    circ = em
+    lost = 4_000_000
+    dormant = 1_500_000
+    liquid = circ - lost
+    real = price
+    theo = price * circ / liquid
+    c1, c2 = st.columns(2)
+    with c1:
+        fig, ax = plt.subplots(figsize=(5,4))
+        labels = ["Liquidi", "Dormienti", "Persi"]
+        vals = [liquid - dormant, dormant, lost]
+        ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
+    with c2:
+        fig, ax = plt.subplots(figsize=(5,4))
+        ax.bar(["Attuale", "Teorico"], [real, theo], color=["blue","orange"])
+        ax.set_ylabel("USD")
+        st.pyplot(fig)
 
 def render_tradingview():
     widget = """
@@ -180,7 +234,8 @@ def main():
         return
     emitted = bc['btc_emitted']
 
-    with st.expander("Calcoli e Stime", expanded=False):
+    st.markdown(f"<h4 style='margin-bottom:0.5rem'>{Calcoli e Stime}</h4>", unsafe_allow_html=True)
+with st.expander("Calcoli e Stime", expanded=False):
         render_metrics(emitted, price)
 
     with st.expander("Statistiche di Rete", expanded=False):
@@ -203,6 +258,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
