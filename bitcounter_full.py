@@ -37,7 +37,7 @@ def add_background_rain():
     </style>
     <div id="btc-container" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1;"></div>
     <script>
-      (function() {
+      (function {
           var container = document.getElementById('btc-container');
           function createBTC() {
               var btc = document.createElement('div');
@@ -54,7 +54,7 @@ def add_background_rain():
           }
           // Crea un nuovo simbolo BTC ogni 200 ms
           setInterval(createBTC, 200);
-      })();
+      });
     </script>
     """
     st.markdown(html_code, unsafe_allow_html=True)
