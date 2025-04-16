@@ -2,16 +2,15 @@ import streamlit as st
 import requests
 import matplotlib.pyplot as plt
 import datetime
-import time
 
 # ===============================================
 # CONFIGURAZIONE E COSTANTI
 # ===============================================
 st.set_page_config(page_title="BITCOUNTER", layout="wide", initial_sidebar_state="expanded")
-REFRESH_INTERVAL = 10  # aggiornamento automatico ogni 10 secondi
+REFRESH_INTERVAL = 10  # in secondi
 
 # ===============================================
-# FUNZIONI DI RACCOLTA DATI CON CACHE (TTL=10 sec)
+# FUNZIONI DI RACCOLTA DATI (CACHED PER TTL=10s)
 # ===============================================
 @st.cache_data(ttl=10)
 def get_btc_price():
@@ -29,7 +28,6 @@ def get_btc_price():
 def get_blockchain_data():
     data = {}
     try:
-        # Ottieni la quantità di satoshi totali emessi e converti in BTC
         response = requests.get("https://api.blockchain.info/q/totalbc", timeout=5)
         response.raise_for_status()
         satoshi_total = int(response.text)
@@ -56,22 +54,20 @@ def estimate_real_supply(btc_emitted, lost_estimate=4_000_000, dormant=1_500_000
 
 def calculate_theoretical_price(price_now, circulating, liquid_supply):
     market_cap = price_now * circulating
-    price_if_real = market_cap / liquid_supply if liquid_supply else 0
-    return price_now, price_if_real
+    return price_now, (market_cap / liquid_supply if liquid_supply else 0)
 
 def estimate_remaining_btc(btc_emitted, total_supply=21_000_000):
     return total_supply - btc_emitted
 
 def estimate_mining_countdown(btc_emitted):
     """
-    Stima il tempo residuo per completare l'emissione dei 21 milioni di BTC.
-    Si assume un block reward costante di 6.25 BTC e 10 minuti per blocco.
-    NOTA: La stima è semplificata e non tiene conto dei prossimi halving.
+    Stima semplificata: si assume un block reward costante di 6.25 BTC
+    e 10 minuti per blocco, senza considerare i prossimi halving.
     """
     block_reward = 6.25
     remaining_btc = estimate_remaining_btc(btc_emitted)
     remaining_blocks = remaining_btc / block_reward
-    seconds_remaining = remaining_blocks * 10 * 60  # 10 minuti per blocco
+    seconds_remaining = remaining_blocks * 10 * 60
     return datetime.datetime.now() + datetime.timedelta(seconds=seconds_remaining)
 
 def format_countdown(target_time):
@@ -99,8 +95,11 @@ def render_overview_boxes(supply_data, price, btc_emitted):
 
 def render_pie_chart(supply_data):
     labels = ["BTC Liquidi", "BTC Dormienti", "BTC Persi"]
-    # I BTC liquidi escludono quelli dormienti
-    values = [supply_data["liquid"] - supply_data["dormant"], supply_data["dormant"], supply_data["lost"]]
+    values = [
+        supply_data["liquid"] - supply_data["dormant"],
+        supply_data["dormant"],
+        supply_data["lost"]
+    ]
     fig, ax = plt.subplots()
     ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
     ax.axis("equal")
@@ -125,13 +124,15 @@ def render_countdown_timer(target_time):
 # PROGRAMMA PRINCIPALE
 # ===============================================
 def main():
+    # Inserisce un meta refresh per ricaricare la pagina automaticamente
+    st.markdown(f"<meta http-equiv='refresh' content='{REFRESH_INTERVAL}'>", unsafe_allow_html=True)
+
     st.title("BITCOUNTER - Real Bitcoin Liquidity Dashboard")
-    st.info(f"Aggiornamento automatico ogni {REFRESH_INTERVAL} secondi")
+    st.info(f"La pagina si aggiorna automaticamente ogni {REFRESH_INTERVAL} secondi")
 
     # Recupero dati aggiornati
     price = get_btc_price()
     blockchain_data = get_blockchain_data()
-
     if price is None or blockchain_data["btc_emitted"] is None:
         st.error("Impossibile recuperare i dati necessari. Riprova più tardi.")
         return
@@ -140,7 +141,11 @@ def main():
 
     # Calcoli e stime
     supply_data = estimate_real_supply(btc_emitted)
-    current_price, theoretical_price = calculate_theoretical_price(price, supply_data["circulating"], supply_data["liquid"])
+    current_price, theoretical_price = calculate_theoretical_price(
+        price, 
+        supply_data["circulating"], 
+        supply_data["liquid"]
+    )
     mining_end_time = estimate_mining_countdown(btc_emitted)
 
     # Visualizzazioni
@@ -149,10 +154,7 @@ def main():
     render_pie_chart(supply_data)
     render_price_chart(current_price, theoretical_price)
 
-    # Aggiornamento automatico: attesa e ricarica la pagina
-    time.sleep(REFRESH_INTERVAL)
-    st.experimental_rerun()
-
 if __name__ == "__main__":
     main()
+
 
