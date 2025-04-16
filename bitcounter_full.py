@@ -49,9 +49,6 @@ def add_background_rain():
           0%, 100% { opacity: 1; }
           50% { opacity: 0.2; }
       }
-      .expander > summary {
-          font-size: 1.2rem !important;
-      }
     </style>
     <div id=\"btc-container\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;\"></div>
     <script>
@@ -74,24 +71,16 @@ def add_background_rain():
     """
     st.markdown(html, unsafe_allow_html=True)
 
-# (Tutte le funzioni API, calcoli, render restano uguali fino a render_sentiment_and_news)
-
-def render_sentiment_and_news():
-    fg = get_fear_greed_index()
-    st.metric(
-        "Fear & Greed Index",
-        f"{fg['value']} ({fg['classification']})",
-        delta=fg['timestamp'].strftime("%Y-%m-%d %H:%M")
-    )
-    st.markdown("**Ultime Notizie su Bitcoin**")
-    for item in get_btc_news():
-        st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
+# =====================================================
+# (funzioni API, calcoli e render non modificate qui per brevità)
+# =====================================================
 
 # =====================================================
 # MAIN
 # =====================================================
 def main():
     add_background_rain()
+
     st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
 
     price = get_btc_price()
@@ -124,6 +113,21 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
