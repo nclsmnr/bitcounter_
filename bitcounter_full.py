@@ -18,7 +18,6 @@ st.set_page_config(
 # EFFETTO DI PIOGGIA DI BTC IN BACKGROUND
 # =====================================================
 def add_background_rain():
-    html = """
    <style>
   @keyframes fall {{ 
     0%   {{ transform: translateY(-100%); opacity: 0 }} 
