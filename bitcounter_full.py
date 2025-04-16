@@ -14,7 +14,48 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 REFRESH_INTERVAL = 60  # auto-refresh ogni 60s
+metrics_and_rain = f"""
+<style>
+  @keyframes fall {{ 
+    0%   {{ transform: translateY(-100%); opacity: 0 }} 
+    10%  {{ opacity: 1 }} 
+    100% {{ transform: translateY(100vh); opacity: 0 }} 
+  }}
+  .btc {{
+    position: absolute;
+    top: -10%;
+    font-size: 24px;
+    color: gold;
+    user-select: none;
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
+  }}
+  .metrics-grid {{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    background: rgba(0,0,0,0.05);
+    padding: 1rem;
+    border-radius: 8px;
+  }}
+</style>
 
+<div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
+<script>
+// Pioggia di ₿
+setInterval(() => {{
+  const c = document.getElementById("btc-container");
+  const d = document.createElement("div");
+  d.className = "btc";
+  d.innerText = "₿";
+  d.style.left = Math.random()*100 + "%";
+  const t = 5 + Math.random()*10;
+  d.style.animationDuration = t + "s";
+  d.style.animationDelay    = Math.random()*t + "s";
+  c.appendChild(d);
+  setTimeout(()=>d.remove(), t*1000);
+}}, 200);
 
 # =====================================================
 # API FETCH + CACHE
