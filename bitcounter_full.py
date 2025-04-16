@@ -182,6 +182,99 @@ def render_metrics(em, price):
         st.metric("BTC da Minare", f"{remaining:,.2f} BTC")
         st.metric("Countdown Mining", format_countdown(end_time))
 
+def render_network():
+    diff = get_network_difficulty()
+    hashrate = get_network_hashrate() / 1e9
+    height = get_block_height()
+    next_halving = ((height // 210000) + 1) * 210000
+    blocks_remaining = next_halving - height
+    halving_time = datetime.datetime.now() + datetime.timedelta(seconds=blocks_remaining * 10 * 60)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Difficoltà", f"{diff:.2f}")
+        st.metric("Hashrate", f"{hashrate:.2f} GH/s")
+    with c2:
+        st.metric("Block Height", f"{height}")
+        st.metric("Tempo Medio Blocco", "10 min (target)")
+    with c3:
+        st.metric("Prox. Halving", f"{next_halving}")
+        st.metric("Countdown Halving", format_countdown(halving_time))
+
+def render_mempool():
+    mp = get_mempool_data()
+    count = mp.get("count")
+    vsize = mp.get("vsize")
+    total_fee = mp.get("total_fee")
+    avg_fee = total_fee / count if count else None
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Tx in Mempool", count or "N/A")
+    with c2:
+        st.metric("Dim. Mempool", f"{vsize} vbytes" if vsize else "N/A")
+    with c3:
+        st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+
+def render_decentralization():
+    nodes = get_node_stats()
+    st.metric("Nodi Attivi", nodes or "N/A")
+
+def render_sentiment_and_news():
+    fg = get_fear_greed_index()
+    st.metric(
+        "Fear & Greed Index",
+        f"{fg['value']} ({fg['classification']})",
+        delta=fg['timestamp'].strftime("%Y-%m-%d %H:%M")
+    )
+    st.markdown("**Ultime Notizie su Bitcoin**")
+    for item in get_btc_news():
+        st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
+
+def render_charts(em, price):
+    circ = em
+    lost = 4_000_000
+    dormant = 1_500_000
+    liquid = circ - lost
+    real = price
+    theo = price * circ / liquid
+    c1, c2 = st.columns(2)
+    with c1:
+        fig, ax = plt.subplots(figsize=(5,4))
+        labels = ["Liquidi", "Dormienti", "Persi"]
+        vals = [liquid - dormant, dormant, lost]
+        ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
+    with c2:
+        fig, ax = plt.subplots(figsize=(5,4))
+        ax.bar(["Attuale", "Teorico"], [real, theo], color=["blue","orange"])
+        ax.set_ylabel("USD")
+        st.pyplot(fig)
+
+def render_tradingview():
+    widget = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div id="tradingview_btc"></div>
+      <script src="https://s3.tradingview.com/tv.js"></script>
+      <script>
+      new TradingView.widget({
+        "width":"100%","height":500,
+        "symbol":"COINBASE:BTCUSD",
+        "interval":"60","timezone":"Etc/UTC",
+        "theme":"light","style":"1","locale":"it",
+        "toolbar_bg":"#f1f3f6",
+        "hide_side_toolbar":false,
+        "withdateranges":true,
+        "allow_symbol_change":true,
+        "details":true,
+        "container_id":"tradingview_btc"
+      });
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    components.html(widget, height=520)
+
 # =====================================================
 # MAIN
 # =====================================================
@@ -201,25 +294,26 @@ def main():
     render_metrics(emitted, price)
 
     st.header("Statistiche di Rete")
-    # render_network()
+    render_network()
 
     st.header("Transazioni & Mempool")
-    # render_mempool()
+    render_mempool()
 
     st.header("Decentralizzazione")
-    # render_decentralization()
+    render_decentralization()
 
     st.header("Sentiment & News")
-    # render_sentiment_and_news()
+    render_sentiment_and_news()
 
     st.header("Grafici Matplotlib")
-    # render_charts(emitted, price)
+    render_charts(emitted, price)
 
     st.header("Grafico a Candele TradingView")
-    # render_tradingview()
+    render_tradingview()
 
 if __name__ == "__main__":
     main()
+
 
 
 
