@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import matplotlib.pyplot as plt
 import datetime
@@ -12,13 +13,13 @@ st.set_page_config(
     layout="wide", 
     initial_sidebar_state="expanded"
 )
-REFRESH_INTERVAL = 60  # Aggiornamento automatico ogni 60 secondi
+REFRESH_INTERVAL = 60  # auto-refresh ogni 60s
 
 # =====================================================
 # EFFETTO DI PIOGGIA DI BTC IN BACKGROUND
 # =====================================================
 def add_background_rain():
-    html_code = """
+    html = """
     <style>
       @keyframes fall {
           0% { transform: translateY(-100%); opacity: 0; }
@@ -36,35 +37,37 @@ def add_background_rain():
           animation-iteration-count: 1;
       }
     </style>
-    <div id="btc-container" style="position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:-1;"></div>
+    <div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
     <script>
-      (function() {
-          var container = document.getElementById('btc-container');
-          function createBTC() {
-              var btc = document.createElement('div');
-              btc.className = 'btc';
-              btc.innerHTML = '₿';
-              btc.style.left = Math.random() * 100 + '%';
-              var duration = 5 + Math.random() * 10;
-              btc.style.animationDuration = duration + 's';
-              btc.style.animationDelay = (Math.random() * duration) + 's';
-              container.appendChild(btc);
-              setTimeout(function() { btc.remove(); }, duration * 1000);
-          }
-          setInterval(createBTC, 200);
-      })();
+    (function(){
+      var c = document.getElementById('btc-container');
+      function createBTC(){
+        var d = document.createElement('div');
+        d.className='btc';
+        d.innerHTML='₿';
+        d.style.left = Math.random()*100+'%';
+        var t = 5 + Math.random()*10;
+        d.style.animationDuration = t + 's';
+        d.style.animationDelay = Math.random()*t + 's';
+        c.appendChild(d);
+        setTimeout(()=>d.remove(), t*1000);
+      }
+      setInterval(createBTC, 200);
+    })();
     </script>
     """
-    st.markdown(html_code, unsafe_allow_html=True)
+    st.markdown(html, unsafe_allow_html=True)
 
 # =====================================================
-# API DATA FETCH (CACHE TTL)
+# API FETCH (+ cache)
 # =====================================================
 @st.cache_data(ttl=60)
 def get_btc_price():
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {"ids": "bitcoin", "vs_currencies": "usd"}
-    r = requests.get(url, params=params, timeout=5)
+    r = requests.get(
+        "https://api.coingecko.com/api/v3/simple/price",
+        params={"ids":"bitcoin","vs_currencies":"usd"},
+        timeout=5
+    )
     r.raise_for_status()
     return r.json()["bitcoin"]["usd"]
 
@@ -72,7 +75,7 @@ def get_btc_price():
 def get_blockchain_data():
     r = requests.get("https://api.blockchain.info/q/totalbc", timeout=5)
     r.raise_for_status()
-    return {"btc_emitted": int(r.text) / 1e8}
+    return {"btc_emitted": int(r.text)/1e8}
 
 @st.cache_data(ttl=60)
 def get_network_difficulty():
@@ -108,105 +111,100 @@ def get_node_stats():
 def get_fear_greed_index():
     r = requests.get("https://api.alternative.me/fng/?limit=1&format=json", timeout=5)
     r.raise_for_status()
-    data = r.json()["data"][0]
+    d = r.json()["data"][0]
     return {
-        "value": int(data["value"]),
-        "classification": data["value_classification"],
-        "timestamp": datetime.datetime.fromtimestamp(int(data["timestamp"]))
+        "value": int(d["value"]),
+        "classification": d["value_classification"],
+        "timestamp": datetime.datetime.fromtimestamp(int(d["timestamp"]))
     }
 
 @st.cache_data(ttl=300)
 def get_btc_news(count=5):
-    rss_url = "https://news.google.com/rss/search?q=bitcoin&hl=en-US&gl=US&ceid=US:en"
-    r = requests.get(rss_url, timeout=5)
+    rss = "https://news.google.com/rss/search?q=bitcoin&hl=en-US&gl=US&ceid=US:en"
+    r = requests.get(rss, timeout=5)
     r.raise_for_status()
     root = ET.fromstring(r.content)
     items = root.findall(".//item")[:count]
     news = []
-    for item in items:
-        title = item.find("title").text
-        link  = item.find("link").text
-        pubDate = item.find("pubDate").text
-        news.append({"title": title, "link": link, "pubDate": pubDate})
+    for it in items:
+        news.append({
+            "title": it.find("title").text,
+            "link": it.find("link").text,
+            "pubDate": it.find("pubDate").text
+        })
     return news
 
 # =====================================================
-# CALCOLI E STIME
+# CALCOLI & STIME
 # =====================================================
-def estimate_real_supply(emitted, lost=4_000_000, dormant=1_500_000):
-    circ   = emitted
-    liq    = circ - lost
-    return {
-        "total": 21_000_000,
-        "circulating": circ,
-        "liquid": liq,
-        "lost": lost,
-        "dormant": dormant
-    }
+def estimate_real_supply(em, lost=4_000_000, dormant=1_500_000):
+    circ = em
+    liq  = circ - lost
+    return {"total":21_000_000,"circulating":circ,"liquid":liq,"lost":lost,"dormant":dormant}
 
-def estimate_remaining_btc(emitted):
-    return 21_000_000 - emitted
+def estimate_remaining_btc(em):
+    return 21_000_000 - em
 
-def estimate_mining_countdown(emitted):
+def estimate_mining_countdown(em):
     reward = 6.25
-    blocks = estimate_remaining_btc(emitted) / reward
-    secs   = blocks * 10 * 60
+    blocks = estimate_remaining_btc(em)/reward
+    secs   = blocks * 10*60
     return datetime.datetime.now() + datetime.timedelta(seconds=secs)
 
 def format_countdown(dt):
     diff = dt - datetime.datetime.now()
-    if diff.total_seconds() <= 0:
-        return "Term. halving/mining"
-    d,h,r = diff.days, *divmod(diff.seconds,3600)
-    m,s   = divmod(r,60)
-    return f"{d}g {h}h {m}m {s}s"
+    if diff.total_seconds()<=0:
+        return "Terminato"
+    d,h = diff.days, *divmod(diff.seconds,3600)
+    m,s = divmod(h[1],60)
+    return f"{d}g {h[0]}h {m}m {s}s"
 
 # =====================================================
-# RENDERING SEZIONI
+# RENDER SEZIONI
 # =====================================================
-def render_metrics(emitted, price):
-    supply = estimate_real_supply(emitted)
-    end_mining = estimate_mining_countdown(emitted)
-    left, right = st.columns(2)
-    with left:
-        st.metric("Supply Massima", f"{supply['total']:,} BTC")
-        st.metric("Supply Emessa", f"{supply['circulating']:,} BTC")
-        st.metric("Supply Liquida", f"{supply['liquid']:,} BTC")
-        st.metric("BTC Persi", f"{supply['lost']:,} BTC")
+def render_metrics(em, price):
+    sup = estimate_real_supply(em)
+    end = estimate_mining_countdown(em)
+    l,r = st.columns(2)
+    with l:
+        st.metric("Supply Massima", f"{sup['total']:,} BTC")
+        st.metric("Supply Emessa", f"{sup['circulating']:,} BTC")
+        st.metric("Supply Liquida", f"{sup['liquid']:,} BTC")
+        st.metric("BTC Persi", f"{sup['lost']:,} BTC")
         st.metric("Prezzo BTC", f"${price:,.2f}")
-    with right:
-        st.metric("BTC da Minare", f"{estimate_remaining_btc(emitted):,.2f} BTC")
-        st.metric("Countdown Fine Mining", format_countdown(end_mining))
+    with r:
+        st.metric("BTC da Minare", f"{estimate_remaining_btc(em):,.2f} BTC")
+        st.metric("Countdown Mining", format_countdown(end))
 
 def render_network():
     diff   = get_network_difficulty()
-    hr     = get_network_hashrate()
+    hr     = get_network_hashrate()/1e9
     height = get_block_height()
     # prossimo halving
     next_h = ((height//210000)+1)*210000
-    to_h   = next_h - height
-    dt_h   = datetime.datetime.now() + datetime.timedelta(seconds=to_h*10*60)
-    left, mid, right = st.columns(3)
-    with left:
+    rem    = next_h - height
+    dt_h   = datetime.datetime.now() + datetime.timedelta(seconds=rem*10*60)
+    c1,c2,c3 = st.columns(3)
+    with c1:
         st.metric("Difficoltà", f"{diff:.2f}")
-        st.metric("Hashrate", f"{hr/1e9:.2f} GH/s")
-    with mid:
+        st.metric("Hashrate", f"{hr:.2f} GH/s")
+    with c2:
         st.metric("Block Height", f"{height}")
         st.metric("Tempo Medio Blocco", "10 min (target)")
-    with right:
+    with c3:
         st.metric("Prox. Halving", f"{next_h}")
         st.metric("Countdown Halving", format_countdown(dt_h))
 
 def render_mempool():
     mp = get_mempool_data()
-    count = mp.get("count")
-    vsize = mp.get("vsize")
-    fee   = mp.get("total_fee")
-    avg_fee = fee/count if count else None
+    cnt = mp.get("count")
+    vsz = mp.get("vsize")
+    fee = mp.get("total_fee")
+    avg = fee/cnt if cnt else None
     c1,c2,c3 = st.columns(3)
-    with c1: st.metric("Tx in Mempool", count or "N/A")
-    with c2: st.metric("Dimensione Mempool", f"{vsize} vbytes" if vsize else "N/A")
-    with c3: st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+    with c1: st.metric("Tx in Mempool", cnt or "N/A")
+    with c2: st.metric("Dim. Mempool", f"{vsz} vbytes" if vsz else "N/A")
+    with c3: st.metric("Fee Media", f"{avg:.2f} sat" if avg else "N/A")
 
 def render_decentralization():
     nodes = get_node_stats()
@@ -217,20 +215,21 @@ def render_sentiment_and_news():
     st.metric(
         "Fear & Greed Index",
         f"{fg['value']} ({fg['classification']})",
-        delta=str(fg['timestamp'].strftime("%Y-%m-%d %H:%M"))
+        delta=fg["timestamp"].strftime("%Y-%m-%d %H:%M")
     )
     st.markdown("**Ultime Notizie su Bitcoin**")
-    for item in get_btc_news():
-        st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
+    for ni in get_btc_news():
+        st.markdown(f"- [{ni['title']}]({ni['link']})  \n  _{ni['pubDate']}_")
 
-def render_charts(emitted, price):
-    supply = estimate_real_supply(emitted)
-    real, theo = price, price * supply["circulating"] / supply["liquid"]
+def render_charts(em, price):
+    sup = estimate_real_supply(em)
+    real = price
+    theo = price * sup["circulating"] / sup["liquid"]
     c1,c2 = st.columns(2)
     with c1:
         fig, ax = plt.subplots(figsize=(5,4))
         labels = ["Liquidi","Dormienti","Persi"]
-        vals = [supply["liquid"]-supply["dormant"], supply["dormant"], supply["lost"]]
+        vals   = [sup["liquid"]-sup["dormant"], sup["dormant"], sup["lost"]]
         ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
         ax.axis("equal")
         st.pyplot(fig)
@@ -240,6 +239,35 @@ def render_charts(emitted, price):
         ax.set_ylabel("USD")
         ax.set_title("Prezzo BTC")
         st.pyplot(fig)
+
+def render_tradingview():
+    widget = """
+    <!-- TradingView Widget BEGIN -->
+    <div class="tradingview-widget-container">
+      <div id="tradingview_btc"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget({
+        "width":"100%",
+        "height":500,
+        "symbol":"COINBASE:BTCUSD",
+        "interval":"60",
+        "timezone":"Etc/UTC",
+        "theme":"light",
+        "style":"1",
+        "locale":"it",
+        "toolbar_bg":"#f1f3f6",
+        "hide_side_toolbar":false,
+        "withdateranges":true,
+        "allow_symbol_change":true,
+        "details":true,
+        "container_id":"tradingview_btc"
+      });
+      </script>
+    </div>
+    <!-- TradingView Widget END -->
+    """
+    components.html(widget, height=520)
 
 # =====================================================
 # MAIN
@@ -251,7 +279,6 @@ def main():
     st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
     st.info(f"Aggiornamento ogni {REFRESH_INTERVAL} s")
 
-    # dati base
     price = get_btc_price()
     bc    = get_blockchain_data()
     if price is None or bc["btc_emitted"] is None:
@@ -274,11 +301,15 @@ def main():
     st.header("Sentiment & News")
     render_sentiment_and_news()
 
-    st.header("Grafici")
+    st.header("Grafici Matplotlib")
     render_charts(emitted, price)
+
+    st.header("Grafico a Candele TradingView")
+    render_tradingview()
 
 if __name__ == "__main__":
     main()
+
 
 
 
