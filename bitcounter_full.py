@@ -151,8 +151,18 @@ def get_btc_news(count=5):
     return news
 
 # =====================================================
-# CALCOLI & STIME / RENDER (omessi per brevità)
+# CALCOLI & STIME / RENDER
 # =====================================================
+def format_countdown(dt):
+    now = datetime.datetime.now()
+    diff = dt - now
+    if diff.total_seconds() <= 0:
+        return "Terminato"
+    days = diff.days
+    hours, rem = divmod(diff.seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"{days}g {hours}h {minutes}m {secs}s"
+
 def render_metrics(em, price):
     circ = em
     lost = 4_000_000
@@ -191,25 +201,26 @@ def main():
     render_metrics(emitted, price)
 
     st.header("Statistiche di Rete")
-    render_network()
+    # render_network()
 
     st.header("Transazioni & Mempool")
-    render_mempool()
+    # render_mempool()
 
     st.header("Decentralizzazione")
-    render_decentralization()
+    # render_decentralization()
 
     st.header("Sentiment & News")
-    render_sentiment_and_news()
+    # render_sentiment_and_news()
 
     st.header("Grafici Matplotlib")
-    render_charts(emitted, price)
+    # render_charts(emitted, price)
 
     st.header("Grafico a Candele TradingView")
-    render_tradingview()
+    # render_tradingview()
 
 if __name__ == "__main__":
     main()
+
 
 
 
