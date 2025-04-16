@@ -20,21 +20,21 @@ st.set_page_config(
 def add_background_rain():
     html = """
     <style>
-      @keyframes fall {
-          0% { transform: translateY(-100%); opacity: 0; }
-          10% { opacity: 1; }
-          100% { transform: translateY(100vh); opacity: 0; }
-      }
-      .btc {
-          position: absolute;
-          top: -10%;
-          font-size: 24px;
-          color: gold;
-          user-select: none;
-          animation-name: fall;
-          animation-timing-function: linear;
-          animation-iteration-count: 1;
-      }
+  @keyframes fall {{ 
+    0%   {{ transform: translateY(-100%); opacity: 0 }} 
+    10%  {{ opacity: 1 }} 
+    100% {{ transform: translateY(100vh); opacity: 0 }} 
+  }}
+  .btc {{
+    position: absolute;
+    top: -10%;
+    font-size: 24px;
+    color: gold;
+    user-select: none;
+    animation-name: fall;
+    animation-timing-function: linear;
+    animation-iteration-count: 1;
+  }}
     </style>
     <div id=\"btc-container\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;\"></div>
     <script>
