@@ -1,2 +1,4 @@
-streamlit run btc_dashboard_streamlit.py
+streamlit
+requests
+matplotlib
 
