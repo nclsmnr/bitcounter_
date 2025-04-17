@@ -50,7 +50,7 @@ def add_background_rain():
           50% { opacity: 0.2; }
       }
     </style>
-    <div id=\"btc-container\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;\"></div>
+    <div id="btc-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;"></div>
     <script>
     (function(){
       var container = document.getElementById('btc-container');
@@ -84,9 +84,6 @@ def get_btc_price():
     r.raise_for_status()
     return r.json()["bitcoin"]["usd"]
 
-# =====================================================
-# ALTRI DATI STATICI
-# =====================================================
 @st.cache_data(ttl=300)
 def get_blockchain_data():
     r = requests.get("https://api.blockchain.info/q/totalbc", timeout=5)
@@ -151,6 +148,63 @@ def get_btc_news(count=5):
     return news
 
 # =====================================================
+# DATI AGGIUNTIVI PER MODELLI TEORICI
+# =====================================================
+@st.cache_data(ttl=300)
+def get_active_addresses():
+    r = requests.get(
+        "https://api.blockchain.info/charts/addresses-active?timespan=1days&rollingAverage=8hours&format=json",
+        timeout=5
+    )
+    r.raise_for_status()
+    data = r.json()
+    return data["values"][-1]["y"]
+
+@st.cache_data(ttl=300)
+def get_onchain_volume():
+    r = requests.get("https://api.blockchain.info/q/24hrbtcsent", timeout=5)
+    r.raise_for_status()
+    return float(r.text)
+
+# =====================================================
+# MODELLI TEORICI DEL PREZZO BTC
+# =====================================================
+def price_theoretical_s2f(supply: float,
+                          block_reward: float = 6.25,
+                          blocks_per_year: int = 52560,
+                          a: float = 0.4,
+                          b: float = 3.3) -> float:
+    """
+    Stock-to-Flow model:
+      flow = block_reward * blocks_per_year
+      sf = supply / flow
+      P_teorico = a * sf^b
+    """
+    flow = block_reward * blocks_per_year
+    sf = supply / flow
+    return a * (sf ** b)
+
+def price_theoretical_metcalfe(active_addresses: float,
+                               c: float = 1e-7) -> float:
+    """
+    Metcalfe's Law:
+      P_teorico = c * (N_active)^2
+    """
+    return c * (active_addresses ** 2)
+
+def price_theoretical_nvt(market_cap: float,
+                          on_chain_volume: float) -> float:
+    """
+    NVT Ratio model:
+      nvt = market_cap / on_chain_volume
+      P_teorico = market_cap / nvt
+    """
+    if on_chain_volume == 0:
+        return 0.0
+    nvt = market_cap / on_chain_volume
+    return market_cap / nvt if nvt else 0.0
+
+# =====================================================
 # CALCOLI & STIME / RENDER
 # =====================================================
 def format_countdown(dt):
@@ -163,24 +217,23 @@ def format_countdown(dt):
     minutes, secs = divmod(rem, 60)
     return f"{days}g {hours}h {minutes}m {secs}s"
 
-def render_metrics(em, price):
-    circ = em
-    lost = 4_000_000
-    dormant = 1_500_000
-    liquid = circ - lost
+def render_metrics(em, price,
+                   theo_ratio, theo_s2f, theo_met, theo_nvt):
     total = 21_000_000
-    remaining = total - circ
-    end_time = datetime.datetime.now() + datetime.timedelta(seconds=(remaining / 6.25) * 600)
+    lost = 4_000_000
+    liquid = em - lost
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Supply Massima", f"{total:,} BTC")
-        st.metric("Supply Emessa", f"{circ:,} BTC")
-        st.metric("Supply Liquida", f"{liquid:,} BTC")
-        st.metric("BTC Persi", f"{lost:,} BTC")
-        st.markdown(f"<span style='font-size: 1.1rem; font-weight: bold;'>Prezzo BTC:</span> ${price:,.2f} <span class='live-indicator'></span>", unsafe_allow_html=True)
+        st.metric("Supply Massima",    f"{total:,} BTC")
+        st.metric("Supply Emessa",     f"{em:,} BTC")
+        st.metric("Supply Liquida",    f"{liquid:,} BTC")
+        st.metric("BTC Persi (lost)",  f"{lost:,} BTC")
     with col2:
-        st.metric("BTC da Minare", f"{remaining:,.2f} BTC")
-        st.metric("Countdown Mining", format_countdown(end_time))
+        st.metric("Prezzo Attuale",       f"${price:,.2f}")
+        st.metric("Prezzo Ratio-Basic",   f"${theo_ratio:,.2f}")
+        st.metric("Prezzo Stock-to-Flow", f"${theo_s2f:,.2f}")
+        st.metric("Prezzo Metcalfe",      f"${theo_met:,.2f}")
+        st.metric("Prezzo NVT",           f"${theo_nvt:,.2f}")
 
 def render_network():
     diff = get_network_difficulty()
@@ -191,14 +244,14 @@ def render_network():
     halving_time = datetime.datetime.now() + datetime.timedelta(seconds=blocks_remaining * 10 * 60)
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.metric("Difficoltà", f"{diff:.2f}")
-        st.metric("Hashrate", f"{hashrate:.2f} GH/s")
+        st.metric("Difficoltà",          f"{diff:.2f}")
+        st.metric("Hashrate",            f"{hashrate:.2f} GH/s")
     with c2:
-        st.metric("Block Height", f"{height}")
-        st.metric("Tempo Medio Blocco", "10 min (target)")
+        st.metric("Block Height",        f"{height}")
+        st.metric("Tempo Medio Blocco",  "10 min (target)")
     with c3:
-        st.metric("Prox. Halving", f"{next_halving}")
-        st.metric("Countdown Halving", format_countdown(halving_time))
+        st.metric("Prox. Halving",       f"{next_halving}")
+        st.metric("Countdown Halving",   format_countdown(halving_time))
 
 def render_mempool():
     mp = get_mempool_data()
@@ -208,15 +261,15 @@ def render_mempool():
     avg_fee = total_fee / count if count else None
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.metric("Tx in Mempool", count or "N/A")
+        st.metric("Tx in Mempool",       count or "N/A")
     with c2:
-        st.metric("Dim. Mempool", f"{vsize} vbytes" if vsize else "N/A")
+        st.metric("Dim. Mempool",        f"{vsize} vbytes" if vsize else "N/A")
     with c3:
-        st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
+        st.metric("Fee Media",           f"{avg_fee:.2f} sat" if avg_fee else "N/A")
 
 def render_decentralization():
     nodes = get_node_stats()
-    st.metric("Nodi Attivi", nodes or "N/A")
+    st.metric("Nodi Attivi",            nodes or "N/A")
 
 def render_sentiment_and_news():
     fg = get_fear_greed_index()
@@ -229,24 +282,26 @@ def render_sentiment_and_news():
     for item in get_btc_news():
         st.markdown(f"- [{item['title']}]({item['link']})  \n  _{item['pubDate']}_")
 
-def render_charts(em, price):
+def render_charts(em, price,
+                  theo_ratio, theo_s2f, theo_met, theo_nvt):
     circ = em
     lost = 4_000_000
     dormant = 1_500_000
     liquid = circ - lost
     real = price
-    theo = price * circ / liquid
+    labels = ["Attuale", "Ratio", "S2F", "Metcalfe", "NVT"]
+    vals   = [real, theo_ratio, theo_s2f, theo_met, theo_nvt]
     c1, c2 = st.columns(2)
     with c1:
         fig, ax = plt.subplots(figsize=(5,4))
-        labels = ["Liquidi", "Dormienti", "Persi"]
-        vals = [liquid - dormant, dormant, lost]
-        ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
+        pie_labels = ["Liquidi dormienti", "Dormienti", "Persi"]
+        pie_vals   = [liquid - dormant, dormant, lost]
+        ax.pie(pie_vals, labels=pie_labels, autopct="%1.1f%%", startangle=90)
         ax.axis("equal")
         st.pyplot(fig)
     with c2:
-        fig, ax = plt.subplots(figsize=(5,4))
-        ax.bar(["Attuale", "Teorico"], [real, theo], color=["blue","orange"])
+        fig, ax = plt.subplots(figsize=(6,4))
+        ax.bar(labels, vals)
         ax.set_ylabel("USD")
         st.pyplot(fig)
 
@@ -275,12 +330,8 @@ def render_tradingview():
     """
     components.html(widget, height=520)
 
-# =====================================================
-# MAIN
-# =====================================================
 def main():
     add_background_rain()
-
     st.title("BITCOUNTER – Real Bitcoin Liquidity Dashboard")
 
     price = get_btc_price()
@@ -290,8 +341,21 @@ def main():
         return
     emitted = bc['btc_emitted']
 
+    # ================================
+    # NUOVI DATI PER MODELLI TEORICI
+    active     = get_active_addresses()
+    volume     = get_onchain_volume()
+    market_cap = price * emitted
+
+    # Calcoli teorici
+    lost        = 4_000_000
+    theo_ratio  = price * emitted / (emitted - lost)
+    theo_s2f    = price_theoretical_s2f(emitted)
+    theo_met    = price_theoretical_metcalfe(active)
+    theo_nvt    = price_theoretical_nvt(market_cap, volume)
+
     st.header("Calcoli e Stime")
-    render_metrics(emitted, price)
+    render_metrics(emitted, price, theo_ratio, theo_s2f, theo_met, theo_nvt)
 
     st.header("Statistiche di Rete")
     render_network()
@@ -306,80 +370,11 @@ def main():
     render_sentiment_and_news()
 
     st.header("Grafici Matplotlib")
-    render_charts(emitted, price)
+    render_charts(emitted, price, theo_ratio, theo_s2f, theo_met, theo_nvt)
 
     st.header("Grafico a Candele TradingView")
     render_tradingview()
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
