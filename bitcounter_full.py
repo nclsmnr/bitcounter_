@@ -142,7 +142,12 @@ def composite_price_model(alpha=0.25, beta=0.25, gamma=0.30, delta=0.20):
     p_liquidity = liquidity_model()
     p_log = log_regression_model()
     composite = alpha * p_s2f + beta * p_metcalfe + gamma * p_liquidity + delta * p_log
-    return composite, {"Stock-to-Flow": p_s2f, "Metcalfe": p_metcalfe, "Liquidity": p_liquidity, "Log Regression": p_log}
+    return composite, {
+        "Stock-to-Flow": p_s2f,
+        "Metcalfe": p_metcalfe,
+        "Liquidity": p_liquidity,
+        "Log Regression": p_log
+    }
 
 # ----------------------------
 # Effetto pioggia BTC sul background
@@ -150,26 +155,73 @@ def composite_price_model(alpha=0.25, beta=0.25, gamma=0.30, delta=0.20):
 
 def add_background_rain():
     html = """
-    <style>/* omitted for brevity */</style>
-    <div id=\"btc-container\"></div>
-    <script>/* omitted for brevity */</script>
+    <style>
+      @keyframes fall {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
+      }
+      .btc {
+          position: absolute;
+          top: -10%;
+          font-size: 24px;
+          color: gold;
+          user-select: none;
+          animation-name: fall;
+          animation-timing-function: linear;
+          animation-iteration-count: 1;
+      }
+      .live-indicator {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          background-color: #00FF00;
+          border-radius: 50%;
+          margin-left: 6px;
+          animation: blink 1s infinite;
+      }
+      @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.2; }
+      }
+    </style>
+    <div id=\"btc-container\" style=\"position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:-1;\"></div>
+    <script>
+    (function(){
+      var container = document.getElementById('btc-container');
+      function createBTC(){
+        var d = document.createElement('div');
+        d.className = 'btc';
+        d.innerText = '₿';
+        d.style.left = Math.random() * 100 + '%';
+        var duration = 5 + Math.random() * 10;
+        d.style.animationDuration = duration + 's';
+        d.style.animationDelay = Math.random() * duration + 's';
+        container.appendChild(d);
+        setTimeout(function(){ d.remove(); }, duration * 1000);
+      }
+      setInterval(createBTC, 200);
+    })();
+    </script>
     """
     st.markdown(html, unsafe_allow_html=True)
 
 # ----------------------------
-# Renderer e utilities
+# Utilities
 # ----------------------------
 def format_countdown(dt):
-    diff = dt - datetime.datetime.now()
+    now = datetime.datetime.now()
+    diff = dt - now
     if diff.total_seconds() <= 0:
         return "Terminato"
-    days, rem = diff.days, diff.seconds
-    hours, rem = divmod(rem, 3600)
+    days = diff.days
+    hours, rem = divmod(diff.seconds, 3600)
     minutes, seconds = divmod(rem, 60)
     return f"{days}g {hours}h {minutes}m {seconds}s"
 
+# ----------------------------
 # Rendering functions
-
+# ----------------------------
 def render_metrics(em, price):
     circ = em
     lost = 4_000_000
@@ -189,7 +241,6 @@ def render_metrics(em, price):
         st.metric("BTC da Minare", f"{remaining:,.2f} BTC")
         st.metric("Countdown Mining", format_countdown(end_time))
 
-
 def render_network():
     diff = get_network_difficulty()
     hashrate = get_network_hashrate() / 1e9
@@ -208,7 +259,6 @@ def render_network():
         st.metric("Prox. Halving", f"{next_halving}")
         st.metric("Countdown Halving", format_countdown(halving_time))
 
-
 def render_mempool():
     mp = get_mempool_data()
     count = mp.get("count")
@@ -223,11 +273,9 @@ def render_mempool():
     with c3:
         st.metric("Fee Media", f"{avg_fee:.2f} sat" if avg_fee else "N/A")
 
-
 def render_decentralization():
     nodes = get_node_stats()
     st.metric("Nodi Attivi", nodes or "N/A")
-
 
 def render_sentiment_and_news():
     fg = get_fear_greed_index()
@@ -238,9 +286,7 @@ def render_sentiment_and_news():
     )
     st.markdown("**Ultime Notizie su Bitcoin**")
     for item in get_btc_news():
-        st.markdown(f"- [{item['title']}]({item['link']})  
-  _{item['pubDate']}_")
-
+        st.markdown(f"- [{item['title']}]({item['link']})  _{item['pubDate']}_")
 
 def render_charts(em, price):
     circ = em
@@ -262,7 +308,6 @@ def render_charts(em, price):
         ax.bar(["Attuale", "Teorico"], [real, theo])
         ax.set_ylabel("USD")
         st.pyplot(fig)
-
 
 def render_tradingview():
     widget = """
@@ -309,5 +354,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
