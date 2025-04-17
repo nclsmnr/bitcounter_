@@ -4,7 +4,98 @@ import requests
 import matplotlib.pyplot as plt
 import datetime
 import xml.etree.ElementTree as ET
+import pandas as pd
+import numpy as np
+import datetime
 
+# ----------------------------
+# Funzioni placeholder per recupero dati (da integrare con API)
+# ----------------------------
+
+def get_btc_circulating_supply():
+    return 19600000  # BTC in circolazione
+
+def get_btc_annual_mining_rate():
+    return 328500  # BTC minati annualmente
+
+def get_active_users():
+    return 900000  # utenti attivi giornalieri (wallet)
+
+def get_liquid_supply():
+    return 7500000  # BTC liquidi stimati
+
+def get_stablecoin_demand_proxy():
+    return 30000000000  # Domanda in stablecoin (USD)
+
+def get_days_since_genesis():
+    genesis_block_date = datetime.date(2009, 1, 3)
+    today = datetime.date.today()
+    return (today - genesis_block_date).days
+
+def get_current_btc_price():
+    return 64000  # Prezzo BTC attuale
+
+# ----------------------------
+# Calcoli dei singoli modelli
+# ----------------------------
+
+def stock_to_flow_model():
+    stock = get_btc_circulating_supply()
+    flow = get_btc_annual_mining_rate()
+    s2f = stock / flow
+    price = np.exp(3 * np.log(s2f) + 2)
+    return price
+
+def metcalfe_model():
+    users = get_active_users()
+    price = 1e-5 * (users ** 2)
+    return price
+
+def liquidity_model():
+    demand = get_stablecoin_demand_proxy()
+    supply = get_liquid_supply()
+    price = demand / supply
+    return price
+
+def log_regression_model():
+    t = get_days_since_genesis()
+    price = np.exp(0.5 * np.log(t) + 4)
+    return price
+
+# ----------------------------
+# Modello Composito
+# ----------------------------
+
+def composite_price_model(alpha=0.25, beta=0.25, gamma=0.30, delta=0.20):
+    p_s2f = stock_to_flow_model()
+    p_metcalfe = metcalfe_model()
+    p_liquidity = liquidity_model()
+    p_log = log_regression_model()
+    composite = alpha * p_s2f + beta * p_metcalfe + gamma * p_liquidity + delta * p_log
+    return composite, {
+        "Stock-to-Flow": p_s2f,
+        "Metcalfe": p_metcalfe,
+        "Liquidity": p_liquidity,
+        "Log Regression": p_log
+    }
+
+# ----------------------------
+# Streamlit Dashboard
+# ----------------------------
+
+st.title("Bitcoin - Prezzo Teorico Composito")
+
+current_price = get_current_btc_price()
+st.metric("Prezzo Attuale BTC", f"${current_price:,.0f}")
+
+st.subheader("Prezzo Teorico Composito (modello)")
+price_composite, breakdown = composite_price_model()
+st.metric("Prezzo Teorico Stimato", f"${price_composite:,.0f}", delta=f"{(price_composite - current_price):,.0f}")
+
+st.subheader("Dettaglio Modelli")
+df_breakdown = pd.DataFrame.from_dict(breakdown, orient='index', columns=['Valore Stimato (USD)'])
+df_breakdown = df_breakdown.sort_values(by='Valore Stimato (USD)', ascending=False)
+st.dataframe(df_breakdown.style.format("{:,.0f}"))
 # =====================================================
 # CONFIGURAZIONE E COSTANTI
 # =====================================================
